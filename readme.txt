@@ -1,4 +1,4 @@
-﻿=== stella plugin ===
+﻿=== Stella free ===
 Contributors: Ruslan.Khakimov
 Donate link: http://store.theme.fm/plugins/stella/
 Tags: languages, localization, multilanguage
