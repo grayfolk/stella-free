@@ -2,7 +2,7 @@
 /*
 	Plugin Name: Stella plugin free
 	Plugin URI: http://store.theme.fm/plugins/stella/
-	Description: Add language versions to all type of posts.
+	Description: Stella plugin for WordPress is designed to give the user a simple and effective way to build a multi-language website. 
 	Version: 1.3 build 42
 	Author: Frumatic
 	Author URI:
