@@ -96,7 +96,7 @@ if( ! class_exists('Stella_Plugin') ){
 				if( stella_file_exists( 'classes/class-multi-post-thumbnails.php' ) ) include_once 'classes/class-multi-post-thumbnails.php';
 				if( stella_file_exists( 'classes/class-stella-language-widget.php' ) ) include_once 'classes/class-stella-language-widget.php';
 				if( stella_file_exists( 'classes/class-force-secondary-hosts-login.php' ) ) include_once 'classes/class-force-secondary-hosts-login.php';
-				//if( stella_file_exists( 'classes/class-free-version-limitations.php' ) ) include_once 'classes/class-free-version-limitations.php';
+				if( stella_file_exists( 'classes/class-free-version-limitations.php' ) ) include_once 'classes/class-free-version-limitations.php';
 				if( stella_file_exists( 'classes/class-filtered-string-localizer.php' ) ) include_once 'classes/class-filtered-string-localizer.php';
 			}
 			if ( ! defined('STELLA_DEFAULT_LANG') ) define('STELLA_DEFAULT_LANG', $this->langs['default']['prefix']);
