@@ -14,7 +14,6 @@ class Stella_Options_Page {
 	private $empty_field_notices;
 	function __construct() {
 		add_action( 'stella_parameters', array( $this, 'start' ), 10, 4 );
-		$this->lang_codes = $this->fill_lang_codes();
 	}
 	function add_styles() {
 		wp_enqueue_style( 'stella_options_page_style', stella_plugin_url() . 'css/options-page.css' );
@@ -24,11 +23,18 @@ class Stella_Options_Page {
 		wp_enqueue_script( 'stella_options_page_script', stella_plugin_url() . 'js/options-page.js' );
 		wp_localize_script( 'stella_options_page_script', 'options_page_vars', $this->get_js_vars() );
 	}
-	function fill_lang_codes(){
+	function load_lang_codes(){
 		if( file_exists( dirname(__FILE__).'/../lang-codes-list.txt') ){
 			$lang_codes = file( dirname(__FILE__).'/../lang-codes-list.txt' );
 		}
-		return apply_filters( 'stella-lang-codes', $lang_codes );
+		// explode lines to lang prefix(code) and lang name
+		$exploded_lang_codes = array();
+		foreach( $lang_codes as $key => $line ){
+			$lang = $this->explode_lang_selection( str_replace( '/\n', '', $line ) );
+			if( false != $lang )
+				$exploded_lang_codes[ strtolower( $lang['prefix'] ) ] = trim($lang['name']);
+		}
+		return apply_filters( 'stella-lang-codes', $exploded_lang_codes );
 	}
 	function explode_lang_selection( $s ){
 		$exploded = explode( '/', $s );
@@ -39,13 +45,13 @@ class Stella_Options_Page {
 	}	
 	function lang_selection_html( $selected_prefix, $tag_name ){
 		$html = "<select name='$tag_name'>";
-		foreach( $this->lang_codes as $code ){
-			$lang = $this->explode_lang_selection( $code );
-			if( false != $lang ){
-				if( strtolower( $lang['prefix'] ) == $selected_prefix ) 
-					$html.="<option selected>$code</option>";
-				else
-					$html.="<option >$code</option>";	
+		foreach( $this->lang_codes as $prefix => $name ){		
+			if( $prefix == $selected_prefix ){
+				$prefix = strtoupper( $prefix );
+				$html.="<option selected>$name / $prefix </option>";
+			}else{
+				$prefix = strtoupper( $prefix );
+				$html.="<option >$name / $prefix </option>";
 			}
 		}
 		$html.='</select>';
@@ -55,6 +61,7 @@ class Stella_Options_Page {
 		$this->langs = $langs;
 		$this->use_hosts = $use_hosts;
 		$this->empty_field_notices = $empty_field_notices;
+		$this->lang_codes = $this->load_lang_codes();
 		// option page
 		add_action( 'admin_menu', array( $this, 'lang_options_menu' ) );
 		// adding styles and scripts
@@ -353,7 +360,7 @@ options_html;
 		if( substr( $host, -1 ) == '-' || substr( $host, 0, 1 ) == '-' || substr( $host, -1 ) == '.' || substr( $host, 0, 1 ) == '.' )
 			return false;
 		// valid chars
-		$valids = '0123456789'.implode( '',range('a','z' ) ).'-.';
+		$valids = '0123456789'.implode( '',range('a','z' ) ).'-./:';
 		if ( strspn( $host, $valids ) != strlen( $host ) ) {
 			return false;
 		}

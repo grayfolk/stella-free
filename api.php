@@ -27,7 +27,7 @@ if ( ! function_exists( 'stella_plugin_url') ) {
 		return trailingslashit( plugins_url( basename( dirname( __FILE__ ) ) ) );
 	}
 }
-
+	
 if ( ! function_exists( 'stella_file_exists' ) ) {
 	function stella_file_exists( $path ) {
 		return file_exists( dirname(__FILE__) . '/' . $path );
@@ -58,15 +58,21 @@ if ( ! function_exists( 'stella_get_default_lang' ) ) {
 	}
 }
 
-if ( !function_exists( 'stella_translate_custom_field') ) {
+if ( ! function_exists( 'stella_translate_custom_field') ) {
 	function stella_translate_custom_field( $id, $field_name, $title, $post_type, $context ) {
 		do_action('stella_translate_custom_field', $id, $field_name, $title, $post_type, $context);
 	}
 }
 
-if ( !function_exists( 'stella_translate_custom_thumbnail') ) {
+if ( ! function_exists( 'stella_translate_custom_thumbnail') ) {
 	function stella_translate_custom_thumbnail( $label, $id, $post_type ) {
 		do_action( 'stella_translate_custom_thumbnail', $label, $id, $post_type );
+	}
+}
+
+if ( ! function_exists('stella_translate_string') ){
+	function stella_translate_string( $filter_name, $original_string, $translations_array ){
+		do_action( 'stella_translate_string', $filter_name, $original_string, $translations_array );
 	}
 }
 

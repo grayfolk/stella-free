@@ -13,19 +13,23 @@ class Url_Changer {
 	private $langs;
 
 	function __construct() {
+		//print_r($GLOBALS);die;
+		$this->rewrite_url(); // only for subfolder situation
+		
 		if ( ! is_admin() )
 			add_action( 'stella_parameters', array( $this, 'start' ), 1, 2 );	
 	}
 
 	function start( $langs, $use_hosts ) {
+		
 		$this->langs = $langs;
 		$this->use_hosts = $use_hosts;
-
+	
 		if ( is_multisite() && defined( 'SUNRISE' ) && defined( 'STELLA_MULTISITE_DOMAIN' )  )
 			$_SERVER['HTTP_HOST'] = STELLA_MULTISITE_DOMAIN;
 
 		$this->look_up_language();
-			
+		
 		// Fix host name
 		if ( $this->use_hosts ) {
 			add_filter( 'option_siteurl', array( $this, 'change_siteurl' ) );
@@ -36,43 +40,34 @@ class Url_Changer {
 
 		// Fix links for /lang/ prefix
 		if ( ! is_admin() && is_permalinks_enabled() ) {
-
-			add_filter( 'option_home', array( $this, 'add_language_prefix_to_url' ) );
-			add_filter( 'content_url', array( $this, 'add_language_prefix_to_url' ) );
+			
+			if( ! $this->is_subfolder() ){
+				add_filter( 'option_home', array( $this, 'add_language_prefix_to_url' ) );
+				add_filter( 'content_url', array( $this, 'add_language_prefix_to_url' ) );
+			}else{
+				add_action('parse_query', array( $this, 'add_language_prefix_after_parse_query') );
+				add_filter( 'content_url', array( $this, 'add_language_prefix_to_url' ) );
+			}
             return;
 		}
-		
+	
 
 		// Fix content links for ?lang
 		if ( ! is_admin() && ! is_permalinks_enabled() ) {
-			/*// if theme don't have custom searchform, filter standart form
+			add_action('parse_query', array( $this, 'add_language_postfix_after_parse_query') );
+			// if theme don't have custom searchform, filter standart form
 			add_filter( 'get_search_form', array( $this, 'localize_searchfrom') );
 			// trying to filter custom searchform
 			add_action( 'wp_enqueue_scripts', array($this, 'add_scripts') );
-			
-			add_filter( 'option_home', array( $this, 'add_language_postfix_to_url' ) );
-			add_filter( 'content_url', array( $this, 'add_language_postfix_to_url' ));
-			add_filter( 'author_feed_link', array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'author_link',	array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'author_feed_link', array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'day_link',  array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'get_comment_author_url_link', array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'month_link', array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'page_link',	array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'post_link',	array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'year_link',	array( $this,  'add_language_postfix_to_url'));
-			add_filter( 'category_feed_link', array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'category_link',	array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'tag_link',	array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'term_link',	array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'the_permalink',	array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'feed_link',	array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'post_comments_feed_link', array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'tag_feed_link',	array( $this, 'add_language_postfix_to_url'));
-			add_filter( 'get_pagenum_link', array( $this, 'add_language_postfix_to_url'));
-			*/
+
 			return;
 		}
+	}
+	function add_language_prefix_after_parse_query( $args ){
+		add_filter( 'home_url', array( $this, 'add_language_prefix_to_url' ));
+	}
+	function add_language_postfix_after_parse_query( $args ){
+		add_filter( 'home_url', array( $this, 'add_language_postfix_to_url' ));
 	}
 	/*
 	 * filter standart searchform
@@ -101,8 +96,14 @@ class Url_Changer {
 		// Language recognition (STELLA_CURRENT_LANG) for multisite should be in sunrise.php
 		if( is_multisite() )
 			return;
-
+		
 		$use_lang = $this->langs['default']['prefix'];
+		
+		// Language recognition in rewrite_url function. only for subfolder situation
+		if( $this->is_subfolder() && is_permalinks_enabled() ){
+			if( ! defined( 'STELLA_CURRENT_LANG' ) ) define('STELLA_CURRENT_LANG', $use_lang);
+			return;
+		}
 
 		if ( $this->use_hosts  ):
 			foreach ( $this->langs['others'] as $prefix => $lang ) {
@@ -123,24 +124,44 @@ class Url_Changer {
 				}
 			endif;
 		else: // Permalinks no-hosts variant.
-			$uri = $_SERVER['REQUEST_URI'];
+			if( ! $this->is_subfolder() ){ //wp is not in subfolder
+				$uri = $_SERVER['REQUEST_URI'];
+				$code = substr( $uri, 0, 4 );
+				if ( '/' != substr( $code, -1 ) )
+					$code = $code . '/';
 
-			$code = substr( $uri, 0, 4 );
-			if ( '/' != substr( $code, -1 ) )
-				$code = $code . '/';
-
-			foreach ( $this->langs['others'] as $prefix => $lang ) {
-				if ( ! ( false === strpos( $code, '/' . $lang['prefix'] . '/' ) ) ) {
-					$use_lang = $lang['prefix'];
-					break;
+				foreach ( $this->langs['others'] as $prefix => $lang ) {
+					if ( ! ( false === strpos( $code, '/' . $lang['prefix'] . '/' ) ) ) {
+						$use_lang = $lang['prefix'];
+						break;
+					}
 				}
 			}
 
 		endif;
-		
-		define('STELLA_CURRENT_LANG', $use_lang);	
-	}
 
+		if( ! defined( 'STELLA_CURRENT_LANG' ) ) define('STELLA_CURRENT_LANG', $use_lang);
+	}
+	
+	/**
+	 * check is wordpress in subfolder
+	 */
+	function is_subfolder(){
+		if( is_multisite() ) return false;
+		$siteurl = get_option('siteurl');
+		$siteurl = str_replace('http://', '', $siteurl);
+		$siteurl = str_replace('https://', '', $siteurl);
+		if( false == strpos($siteurl, '/') )
+			return false;
+		return true;
+	}	
+	function get_subfolder_name(){
+		$siteurl = get_option('siteurl');
+		$siteurl = str_replace('http://', '', $siteurl);
+		$siteurl = str_replace('https://', '', $siteurl);
+		// cut SERVER_NAME to get subfolder
+		return str_replace( '/', '', substr( $siteurl, strlen($_SERVER['SERVER_NAME']), strlen($siteurl) - strlen($_SERVER['SERVER_NAME']) ) );
+	}
 	/**
 	 * Filter for content_url
 	 * NO HOSTS
@@ -180,6 +201,7 @@ class Url_Changer {
 	 * TODO ensure it works perfect
 	 */
 	function add_language_prefix_to_url( $value ) {
+		
 		if( defined('STELLA_DEFAULT_LANG') && defined('STELLA_CURRENT_LANG') ){
 			$pos = strpos($value, '/wp-content/');
 			$admin = strpos($value, '/wp-includes/');
@@ -196,8 +218,9 @@ class Url_Changer {
 					}
 
 				} else  {
-
-					$value = str_replace($_SERVER['HTTP_HOST'], $_SERVER['HTTP_HOST'] . '/' . STELLA_CURRENT_LANG, $value);
+					$siteurl = get_option('siteurl');
+					$value = str_replace( $siteurl, $siteurl . '/' . STELLA_CURRENT_LANG , $value);
+		
 				}
 			}
 		}
@@ -207,7 +230,7 @@ class Url_Changer {
 	/**
 	 * When use hosts change the siteurl, permalinks or not.
 	 */
-	function change_siteurl($value) {
+	function change_siteurl( $value ) {
 
 		if ($this->langs['default']['prefix'] != STELLA_CURRENT_LANG){
 			$new_url = $this->langs['others'][STELLA_CURRENT_LANG]['host'];
@@ -246,6 +269,50 @@ class Url_Changer {
 		else
 			$value = 'http://' . $new_url . $value;
 		return $value;
+	}
+	/**
+	 * Rewrite input url for wordpress use. Rosetta already gathered all information about language,
+	 * so we need to remove prefix from url for correct wordpress work.
+	 * This method called only when permalinks enabled and not hosts, so no further checks.
+	 * NO_HOSTS
+	 * PERMALINKS
+	 */
+	private function rewrite_url() {
+		
+		if ( is_multisite() || ! $this->is_subfolder() || ! is_permalinks_enabled() )
+			return;
+		
+		$ending_slash = false;
+		if( '/' == substr($_SERVER['REQUEST_URI'], -1) )
+			$ending_slash = true;
+		
+		$uri = ( $ending_slash ) ? $_SERVER['REQUEST_URI'] . '/' : $_SERVER['REQUEST_URI'];
+
+		$subfolder_name =  $this->get_subfolder_name();
+		$code_start = strrpos( $uri, $subfolder_name ) + strlen( $subfolder_name );
+
+		$code = substr( $uri, $code_start, 4 );
+		$code = trim( str_replace('/', '', $code) );
+
+		$options = get_option('stella-options');
+		
+		foreach ( $options['langs']['others'] as $prefix => $lang ) {
+			if ( ! ( false === strpos( $code, $lang['prefix'] ) ) ) {
+				$uri = str_replace( $code.'/', '', $uri);
+				define('STELLA_CURRENT_LANG', $code);
+				break;
+			}
+		}
+		
+		// Recreate REQUEST_URI
+		$_SERVER['REQUEST_URI'] =  preg_replace('/\/{2,}/','/', $uri );
+
+		if ('' == $_SERVER['REQUEST_URI']) :
+			$_SERVER['REQUEST_URI'] = '/';
+		endif;
+		
+		$_SERVER['REDIRECT_URL'] = $_SERVER['REQUEST_URI'];
+
 	}
 }
 new Url_Changer();

@@ -2,11 +2,12 @@
 /*
 	Plugin Name: Stella plugin free
 	Plugin URI: http://store.theme.fm/plugins/stella/
-	Description: Simple and effective way to build a multi-language website.
-	Version: 1.2.39
+	Description: Add language versions to all type of posts.
+	Version: 1.3 build 42
 	Author: Frumatic
 	Author URI:
 	Usage: Everywhere
+ 
 	== Programmer's guide ==
 
 	== How it works? ==
@@ -56,7 +57,6 @@
 	                 |- prefix2 - [ prefix, name, host ]
 	                 |- prefixN - [ prefix, name, host ]
  */
-
 if( ! class_exists('Stella_Plugin') ){
 	
 	include_once 'api.php';
@@ -83,12 +83,7 @@ if( ! class_exists('Stella_Plugin') ){
 				
 			if( ! stella_file_exists( 'classes/class-multisite-allow.php' ) && is_multisite() ){
 				add_action( 'admin_notices', array( $this, 'multisite_not_allow' ) );
-			}elseif( ! $this->is_permalinks_or_host_mode() ){
-				add_action( 'admin_notices', array( $this, 'enable_permalinks_or_host_mode' ) );
-				if( stella_file_exists( 'classes/class-stella-options-page.php' ) ) include_once 'classes/class-stella-options-page.php';
-				if( stella_file_exists( 'classes/class-free-version-limitations.php' ) ) include_once 'classes/class-free-version-limitations.php';
 			}else{
-				
 				if( stella_file_exists( 'classes/class-url-changer.php' ) ) include_once 'classes/class-url-changer.php';
 				if( stella_file_exists( 'classes/class-stella-options-page.php' ) ) include_once 'classes/class-stella-options-page.php';
 				if( stella_file_exists( 'classes/class-admin-bar-switcher.php' ) ) include_once 'classes/class-admin-bar-switcher.php';
@@ -101,10 +96,12 @@ if( ! class_exists('Stella_Plugin') ){
 				if( stella_file_exists( 'classes/class-multi-post-thumbnails.php' ) ) include_once 'classes/class-multi-post-thumbnails.php';
 				if( stella_file_exists( 'classes/class-stella-language-widget.php' ) ) include_once 'classes/class-stella-language-widget.php';
 				if( stella_file_exists( 'classes/class-force-secondary-hosts-login.php' ) ) include_once 'classes/class-force-secondary-hosts-login.php';
-				if( stella_file_exists( 'classes/class-free-version-limitations.php' ) ) include_once 'classes/class-free-version-limitations.php';
+				//if( stella_file_exists( 'classes/class-free-version-limitations.php' ) ) include_once 'classes/class-free-version-limitations.php';
+				if( stella_file_exists( 'classes/class-filtered-string-localizer.php' ) ) include_once 'classes/class-filtered-string-localizer.php';
 			}
 			if ( ! defined('STELLA_DEFAULT_LANG') ) define('STELLA_DEFAULT_LANG', $this->langs['default']['prefix']);
 
+			do_action('stella_init');
 			do_action('stella_parameters', $this->langs, $this->use_hosts, $this->use_default_lang_values, $this->empty_field_notices);
 			do_action('stella_lang_menu', $this->get_lang_menu());
 
@@ -274,23 +271,29 @@ if( ! class_exists('Stella_Plugin') ){
 				$lang_code = $lang_prefix;
 			else
 				$lang_code = '';
-
-			if ( STELLA_DEFAULT_LANG != $lang_prefix )
-				$href = $host . '/' . $path . '/' . $lang_code  . '/' . $uri . $lang_tmp;
-			else
+				
+			if ( STELLA_DEFAULT_LANG != $lang_prefix ){
+				if( $this->is_subfolder() ){ // if single wordpress is in subfolder
+					$subfolder_name = $this->get_subfolder_name();
+					$uri = str_replace( $subfolder_name, $subfolder_name . '/' . $lang_code, $uri);
+					$href = $host . '/' . $path . '/' . $uri . $lang_tmp;
+				}else{
+					$href = $host . '/' . $path . '/' . $lang_code  . '/' . $uri . $lang_tmp;
+				}
+			}else{
 				$href = $host . '/' . $path . '/' . $uri;
-
+			}
+					
 			$href = preg_replace('/\/{2,}/','/', $href);
-
+			
 			return apply_filters( 'stella_get_permalink', $href, $lang_prefix );
 		}
 		function get_lang_menu(){
 			$lang_menu = array();
-
 			// Set menu item for default language.
 			$href = $this->get_permalink( ( $this->use_hosts ) ? $this->langs['default']['host'] : $_SERVER['HTTP_HOST'], $this->langs['default']['prefix'] );
 			$lang_menu[ $this->langs['default']['prefix'] ] = array(
-					'title' => $this->langs['default']['name'],
+					'title' => apply_filters( 'stella_lang_name', $this->langs['default']['name'] ),
 					'href' => $href,
 			);
 
@@ -300,7 +303,7 @@ if( ! class_exists('Stella_Plugin') ){
 				$href = $this->get_permalink( ( $this->use_hosts ) ? $lang['host'] : $_SERVER['HTTP_HOST'], $lang['prefix'] );
 
 				$lang_menu[ $lang['prefix'] ] = array(
-					'title' => $lang['name'],
+					'title' => apply_filters( 'stella_lang_name', $lang['name'] ),
 					'href' => $href,
 				);
 			}
@@ -308,6 +311,22 @@ if( ! class_exists('Stella_Plugin') ){
 		}
 		function is_enabled() {
 			return true;
+		}
+		function is_subfolder(){
+			if( is_multisite() ) return false;
+			$siteurl = get_option('siteurl');
+			$siteurl = str_replace('http://', '', $siteurl);
+			$siteurl = str_replace('https://', '', $siteurl);
+			if( false == strpos($siteurl, '/') )
+				return false;
+			return true;
+		}
+		function get_subfolder_name(){
+			$siteurl = get_option('siteurl');
+			$siteurl = str_replace('http://', '', $siteurl);
+			$siteurl = str_replace('https://', '', $siteurl);
+			// cut SERVER_NAME to get subfolder
+			return str_replace( '/', '', substr( $siteurl, strlen($_SERVER['SERVER_NAME']), strlen($siteurl) - strlen($_SERVER['SERVER_NAME']) ) );
 		}
 	}
 	add_action('after_setup_theme', create_function('', 'new Stella_Plugin();'));
