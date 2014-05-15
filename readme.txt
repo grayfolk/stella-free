@@ -1,4 +1,4 @@
-﻿=== Stella plugin ===
+=== Stella plugin ===
 Contributors: Ruslan.Khakimov
 Donate link: http://store.theme.fm/plugins/stella/
 Tags: languages, localization, multilanguage
@@ -7,7 +7,8 @@ Tested up to: 3.9
 Stable tag: 1.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
-Usage: Free
+
+Simple and effective way to build a multi-language website.
 
 == Description ==  
 
