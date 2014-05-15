@@ -1,12 +1,13 @@
-﻿=== stella plugin ===
+﻿=== Stella plugin ===
 Contributors: Ruslan.Khakimov
 Donate link: http://store.theme.fm/plugins/stella/
 Tags: languages, localization, multilanguage
 Requires at least: 3.3
-Tested up to: 3.4.1
+Tested up to: 3.9
 Stable tag: 1.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Usage: Free
 
 == Description ==  
 
@@ -39,26 +40,51 @@ This is a plugin options page. Here you must select languages that you are waт�
 You can use auto-generated URLs or configure host names for multiple languages via your provider service. Either way will work, so it’s up to you which way to choose. This option is selected via “use hosts” checkbox. If it is selected, you must define pre-arranged host names. With this option unchecked, plugin will form URLs automatically like http://yoursite.com/language/post_name
 That’s all - plugin is installed and ready to go.
 
-Currently plugin is translated to two languages - Russian and English.
+Currently plugin is translated to: Russian, English, Italian.
 
 That’s all - we hope that you’ll like our plugin. Suggestions, questions and other feedback are welcomed. Email: support@theme.fm
 
 == Frequently Asked Questions ==
 
-= Can I use host names for multiple languages? =
+= How to include language switcher somewhere in site? =
+Insert this code in your theme file: 
+`<?php the_widget( "Stella_Language_Widget"); ?>`
 
-Yes, you can. 
+= How to change lang names? =
+Use stella-lang-codes filter. 
+Example. Add this code in your theme functions.php file: 
+`add_filter( 'stella-lang-codes', 'change_lang_names');
+function change_lang_names( $langs ){
+	$langs['en'] = 'ENG';
+	$langs['ru'] = 'RUS';
+	return $langs;
+}`
+The same to add new language: 
+`add_filter( 'stella-lang-codes', 'add_new_langs');
+function add_new_langs( $langs ){
+	$langs['kl'] = 'Klingon';
+	return $langs;
+}`
+Resave stella settings to make effect!
+
+= Some content doesn't load because of the permalink structure. What would be the best solution to fix this? =
+Please, use get_template_directory_uri function to link your theme files.
+
+= I want to use this domains: site.com (for English) and site.nl (for Dutch) How would I set this up at my host? Do I point all the domains to the same directory Wordpress is installed in? =
+Yes, you need to configure your web server to point all this domains to the same directory. ( you can use aliases or virtual hosts )
+
+= My post title ( post content, site title ) not translated in frontend =
+Check your theme for $post->post_title code. Use get_the_title() function instead. Because Stella uses the_title filter.
 
 = What do I get with the full version? =
 
-1. Post tags and categories localization
+1. Post tags, categories and custom taxonomies localization
 2. Post featured images localization
-3. Custom metabox localization
-4. Admin bar language switching
-5. Multisite support
-6. "Transfer default language content" switcher
+3. Admin bar language switching
+4. Multisite support
 
-For any questions mail to ruslan.khakimov@frumatic.com
+You can find more information in documentation http://store.theme.fm/files/2012/06/Stella-Documentation.pdf
+For any questions mail to support@theme.fm
 
 == Screenshots ==
 
@@ -67,9 +93,18 @@ For any questions mail to ruslan.khakimov@frumatic.com
 
 == Changelog ==
 
+= 1.4 =
+- content_url() & includes_url() instead hardcoded 'wp-content', 'wp-includes'
+- Wordpress installed in some subdirectories
+- API: stella_translate_filter function
+- API: stella_localize_taxonomies function
+- API: stella_menu_language_switcher_item_html filter
+- widgetkit plugin compatiblity
+- visual composer plugin compatiblity
+- menu language switcher
 = 1.3 =
--Wordpress in subfolder support
--Query mode support ( non-permalinks situation )
--'stella_lang_name' filter to localize language names
+Wordpress in subfolder support
+Query mode support ( non-permalinks situation )
+API updates
 = 1.2 =
 Plugin release.

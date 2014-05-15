@@ -23,26 +23,6 @@ class Stella_Options_Page {
 		wp_enqueue_script( 'stella_options_page_script', stella_plugin_url() . 'js/options-page.js' );
 		wp_localize_script( 'stella_options_page_script', 'options_page_vars', $this->get_js_vars() );
 	}
-	function load_lang_codes(){
-		if( file_exists( dirname(__FILE__).'/../lang-codes-list.txt') ){
-			$lang_codes = file( dirname(__FILE__).'/../lang-codes-list.txt' );
-		}
-		// explode lines to lang prefix(code) and lang name
-		$exploded_lang_codes = array();
-		foreach( $lang_codes as $key => $line ){
-			$lang = $this->explode_lang_selection( str_replace( '/\n', '', $line ) );
-			if( false != $lang )
-				$exploded_lang_codes[ strtolower( $lang['prefix'] ) ] = trim($lang['name']);
-		}
-		return apply_filters( 'stella-lang-codes', $exploded_lang_codes );
-	}
-	function explode_lang_selection( $s ){
-		$exploded = explode( '/', $s );
-		if( 2 == count( $exploded ) ){
-			return array( 'name'=>trim( $exploded['0'] ), 'prefix'=>trim( $exploded['1'] ) );
-		}
-		return false; 
-	}	
 	function lang_selection_html( $selected_prefix, $tag_name ){
 		$html = "<select name='$tag_name'>";
 		foreach( $this->lang_codes as $prefix => $name ){		
@@ -61,13 +41,14 @@ class Stella_Options_Page {
 		$this->langs = $langs;
 		$this->use_hosts = $use_hosts;
 		$this->empty_field_notices = $empty_field_notices;
-		$this->lang_codes = $this->load_lang_codes();
+		$this->lang_codes = stella_get_langs_codes();
 		// option page
 		add_action( 'admin_menu', array( $this, 'lang_options_menu' ) );
 		// adding styles and scripts
 		add_action( 'admin_init', array( $this, 'add_styles' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'add_scripts' ) );
 	}
+	
 	function get_js_vars() {
 		$vars = array(
 			'btn_delete' => __( 'Delete', 'stella-plugin' ),
@@ -93,6 +74,18 @@ class Stella_Options_Page {
 				</label>";
 		return $html;
 	}
+    function registered_nav_menus_html( $options ){
+        $menus = get_terms( 'nav_menu', array( 'hide_empty' => true ) );
+        $inputs = "";
+        $display = ( $options['switcher_in_menu']['enabled'] ) ? 'block' : 'none';
+        foreach( $menus as $menu ){
+            $checked = ( isset($options['switcher_in_menu']['menus']) && in_array( $menu->slug, $options['switcher_in_menu']['menus'] ) ) ? 'checked="checked"' : '';
+            $inputs .= "<input type='checkbox' value='{$menu->slug}' name='switcher-menus[]' $checked>{$menu->name}</br>";
+        }
+        $html = "<tr class='registered-nav-menus' style='display: $display'><td align='left' style='padding-left: 30px;'>$inputs</td></tr>";
+        return $html;
+    }
+
 	function options_page_html(){
 		// load options from db 
 		$options = ( is_multisite() ) ? get_blog_option( get_current_blog_id(), 'stella-options' ) : get_option( 'stella-options' );
@@ -103,9 +96,11 @@ class Stella_Options_Page {
 			);
 		$langs = ( isset( $options['langs'] ) ) ? $options['langs'] : $default_langs_array;
 		$use_hosts = ( isset( $options['use_hosts'] ) ) ? $options['use_hosts'] : false;
-		$use_default_lang_values = ( isset( $options['use_default_lang_values'] ) ) ? $options['use_default_lang_values'] : false;
-		$empty_field_notices = ( isset( $options['empty_field_notices'] ) ) ? $options['empty_field_notices'] : true;
-		
+		$use_default_lang_values = ( isset( $options['use_default_lang_values'] ) ) ? $options['use_default_lang_values'] : true;
+		$empty_field_notices = ( isset( $options['empty_field_notices'] ) ) ? $options['empty_field_notices'] : false;
+        $language_switcher_in_menu = ( isset( $options['switcher_in_menu']['enabled'] ) ) ? $options['switcher_in_menu']['enabled'] : false;
+        $registered_nav_menus_html = $this->registered_nav_menus_html( $options );
+
 		// checking to set default values
 		if ( $langs['default']['name'] == '' )
 			$langs['default']['name'] = 'English';
@@ -118,6 +113,7 @@ class Stella_Options_Page {
 		$p_title = __( 'Stella plugin settings','stella-plugin' );
 		$p_langs_section_name = __( 'Languages','stella-plugin' );
 		$p_mode_section_name = __( 'Mode','stella-plugin' );
+        $p_other_section_name = __( 'Other settings', 'stella-plugin');
 		$p_default = __( 'Default','stella-plugin' );
 		$p_additional = __( 'Additional','stella-plugin' );
 		$p_help = __( 'LANGUAGE NAME / PREFIX','stella-plugin' );
@@ -126,7 +122,8 @@ class Stella_Options_Page {
 		$p_delete = __( 'Delete','stella-plugin' );
 		$p_use_host = __( 'Use hosts','stella-plugin' );
 		$p_use_default_lang_values = __( 'Transfer default language content','stella-plugin' );
-		$p_use_default_lang_values_help = __( 'With this option on default language content will be transferred to empty local content','stella-plugin' );
+        $p_language_switcher_in_menu = __( 'Add language switcher in menu' );
+		$p_use_default_lang_values_help = __( 'If no translation available, stella will use default language content','stella-plugin' );
 		$p_display_empty_field_notices = __( 'Display empty field notices','stella-plugin' );
 		$p_update = __('Save Changes');
 		$host_placeholder = __( 'Please fill hostname', 'stella-plugin' );
@@ -139,7 +136,7 @@ class Stella_Options_Page {
 		$lang_list_html = '';
 		if ( isset( $langs['others'] ) ) {
 			foreach ( $langs['others'] as $prefix => $lang ) {
-				$lang_list_html.= '<div class="lang-wrapper"><div class="select">' . $this->lang_selection_html(  $lang['prefix'],'lang[]' ) . '</div><input class="host-options'.$is_hidden.'" type="text" name="host[]" value="' . $lang['host'] . '" placeholder="' . $host_placeholder . '"/><input type="button" class="square-button del-button" name="del-host" value="'.$p_delete.'"/></div>';
+				$lang_list_html.= '<div class="lang-wrapper"><div class="select">' . $this->lang_selection_html(  $lang['prefix'],'lang[]' ) . '</div><input class="host-options'.$is_hidden.'" type="text" name="host[]" value="' . $lang['host'] . '" placeholder="' . $host_placeholder . '"/><input type="button" class="button del-button" name="del-host" value="'.$p_delete.'"/></div>';
 			}
 		}
 		// advertisment html 
@@ -148,7 +145,8 @@ class Stella_Options_Page {
 		$use_hosts_html = $this->switcher_html( "use-hosts", $use_hosts );
 		$use_default_lang_values_html = $this->switcher_html( "use-default-lang-values", $use_default_lang_values );
 		$empty_field_notices_html = $this->switcher_html( "empty-field-notices", $empty_field_notices );
-		
+        $language_switcher_in_menu_html = $this->switcher_html( "switcher-in-menu", $language_switcher_in_menu );
+
 		if ( is_multisite() ) {
 
 			if ( ! defined( 'SUNRISE' ) ) {
@@ -218,7 +216,12 @@ class Stella_Options_Page {
 					<td>
 						$use_hosts_html
 					</td>
-				</tr>				
+				</tr>
+            </table>
+
+            <h3>$p_other_section_name</h3>
+
+            <table width="100%" cellpadding="10" class="form-table">
 				<tr valign="top">
 					<td align="left" scope="row" class="switcher-section">
 						<h4>$p_display_empty_field_notices</h4>							
@@ -229,11 +232,21 @@ class Stella_Options_Page {
 				</tr>
 				<tr valign="top">
 					<td align="left" scope="row" class="switcher-section">
-						<h4>$p_use_default_lang_values</h4>							
+						<h4>$p_use_default_lang_values</h4>
 					</td>
 					<td>
 						$use_default_lang_values_html<span class="description">$p_use_default_lang_values_help</span>
 					</td>
+				</tr>
+				<tr valign="top">
+					<td align="left" scope="row" class="switcher-section">
+						<h4>$p_language_switcher_in_menu</h4>
+					</td>
+					<td>
+						$language_switcher_in_menu_html
+					</td>
+			        $registered_nav_menus_html
+
 				</tr>
 			</table>
 			$advertisment
@@ -271,16 +284,30 @@ options_html;
 			else
 				$new_options['use_default_lang_values'] = false;
 			
-			// display empty gield notices
+			// display empty field notices
 			if( isset( $_POST['empty-field-notices'] ) && 'on' == $_POST['empty-field-notices'] )
 				$new_options['empty_field_notices'] = true;
 			else
 				$new_options['empty_field_notices'] = false;
-			
-			
+
+
+            // menu language switcher
+            if( isset( $_POST['switcher-in-menu'] ) && 'on' == $_POST['switcher-in-menu'] )
+                $new_options['switcher_in_menu']['enabled'] = true;
+            else
+                $new_options['switcher_in_menu']['enabled'] = false;
+
+            // menus
+            if( isset( $_POST['switcher-menus'] ) ){
+                //var_dump($_POST['switcher-menus']);die;
+                foreach ( $_POST['switcher-menus'] as $key => $menu ) {
+                    $new_options['switcher_in_menu']['menus'][] = $menu;
+                }
+            }
+
 			// getting default_lang
 			$new_default_host = $this->trim_h( $_POST['default-host'] );
-			$default_lang = $this->explode_lang_selection( $_POST['default-lang'] ) ;
+			$default_lang = stella_explode_lang_line( $_POST['default-lang'] ) ;
 			$new_options['langs']['default']['prefix'] = strtolower( $default_lang['prefix'] );
 			$new_options['langs']['default']['name'] = $default_lang['name'];
 			// don't save host if it is not valid
@@ -300,7 +327,7 @@ options_html;
 				$len = count( $_POST['lang'] );
 				for ( $i = 0; $i < $len; $i++ ) {
 					$new_host = $this->trim_h( $_POST['host'][$i] );	
-					$lang = $this->explode_lang_selection( $_POST['lang'][$i] );
+					$lang = stella_explode_lang_line( $_POST['lang'][$i] );
 					if( $_POST['lang'][$i] != $_POST['default-lang'] && !isset( $new_options['langs']['others'][strtolower( $lang['prefix'] )]['prefix'] ) ){
 						if( $new_host != $new_default_host && !isset( $used_hosts[$new_host] ) || $new_host == '' ){
 							$new_options['langs']['others'][strtolower( $lang['prefix'] )]['prefix'] = strtolower( $lang['prefix'] );
@@ -344,7 +371,7 @@ options_html;
 	function options_page() {
 		// checking permissions 
 		if ( !current_user_can( 'manage_options' ) ) {
-			echo $this->error_message_html( __( 'You do not have sufficient permissions to access this page.' ), 'error' );
+			echo $this->message_html( __( 'You do not have sufficient permissions to access this page.' ), 'error' );
 		}else{
 			echo $this->update_stella_options();
 			echo $this->options_page_html();

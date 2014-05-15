@@ -21,7 +21,8 @@ if( !class_exists('Stella_Language_Widget') ){
 			if(isset($this->lang_menu)){
 				foreach ($this->lang_menu as $prefix=>$item){
 					$href = is_ssl() ? 'https://'.$item['href'] : 'http://'.$item['href'];
-					$lang_list_html.= '<li><a href="'.$href.'">'.$item['title'].'</a></li>';
+					$class = ( STELLA_CURRENT_LANG == $prefix ) ? "class='active'": '';
+					$lang_list_html.= "<li $class><a href='$href'>{$item['title']}</a></li>";
 				}
 			}		
 			$lang_list_html .= '</ul>';

@@ -21,7 +21,8 @@ class Post_Localizer {
 		$this->use_hosts = $use_hosts;
 		$this->use_default_lang_values = $use_default_lang_values;
 		$this->empty_field_notices = $empty_field_notices;
-		if ( ! is_admin() ){
+
+		if ( ( ! is_admin() || defined( 'DOING_AJAX' ) ) && defined('STELLA_CURRENT_LANG') && defined('STELLA_DEFAULT_LANG') ){
 			// changes post title and body
 			add_filter('the_title', array($this, 'localize_title'), 1, 2);
 			if(class_exists('WPSEO_Frontend'))
@@ -29,15 +30,11 @@ class Post_Localizer {
 			add_filter('single_post_title', array($this, 'localize_single_post_title'), 1, 2);
 			add_filter('the_content', array($this, 'localize_body'), 1, 1);
 			add_filter('get_the_excerpt', array($this, 'localize_excerpt'), 1, 1);
-			//add_filter('post_link', array($this, 'localize_slug'), 1, 3);
-			//add_action('pre_get_posts', array($this, 'filter_query_for_slug'));
-			//add_filter('stella_get_permalink', array($this, 'filter_stella_permalink'), 1, 2);
 			// don't show posts without title and body
 			add_filter('posts_where_request', array($this, 'filter_get_posts_where'), 1, 1);
 			add_filter('posts_join_request', array($this, 'filter_get_posts_join'), 1, 1);
 			add_filter('posts_distinct_request', array($this, 'filter_get_posts_distinct'), 1, 1);
 			add_filter('posts_search', array($this,'localize_search'), 1, 1);
-			//add_filter('posts_request', array($this,'show_request'), 1, 1 );
 		}
 		// metaboxes
 		add_action('add_meta_boxes', array($this, 'add_metaboxes'), 100);
@@ -48,7 +45,7 @@ class Post_Localizer {
 		add_action('admin_enqueue_scripts', array($this, 'add_scripts'));
 		
 		//notice messages
-		if( $this->empty_field_notices )
+		if( apply_filters( 'show_field_notices', $this->empty_field_notices ) )
 			add_action('admin_notices',array($this, 'fields_checker'));
 		
 	}
@@ -114,15 +111,17 @@ class Post_Localizer {
 		return $distinct;
 	}
 	function filter_get_posts_where( $where ){
-		global $wpdb;
-		$c_lang = STELLA_CURRENT_LANG;
-		if( is_search() && STELLA_CURRENT_LANG != STELLA_DEFAULT_LANG ){
-				$where = "AND (wpm.post_id = $wpdb->posts.ID)" . $where;
-		}else{
-			if( STELLA_CURRENT_LANG != STELLA_DEFAULT_LANG && ! $this->use_default_lang_values ){
-				$where.=" AND exists ( SELECT * FROM $wpdb->postmeta pm 
-					WHERE pm.post_id = $wpdb->posts.ID 
-					AND (pm.meta_key = '_title-{$c_lang}' OR pm.meta_key = '_body-{$c_lang}'))";
+		if( defined('STELLA_CURRENT_LANG') && defined('STELLA_DEFAULT_LANG') ){
+			global $wpdb;
+			$c_lang = STELLA_CURRENT_LANG;
+			if( is_search() && STELLA_CURRENT_LANG != STELLA_DEFAULT_LANG ){
+					$where = "AND (wpm.post_id = $wpdb->posts.ID)" . $where;
+			}else{
+				if( STELLA_CURRENT_LANG != STELLA_DEFAULT_LANG && ! $this->use_default_lang_values ){
+					$where.=" AND exists ( SELECT * FROM $wpdb->postmeta pm 
+						WHERE pm.post_id = $wpdb->posts.ID 
+						AND (pm.meta_key = '_title-{$c_lang}' OR pm.meta_key = '_body-{$c_lang}'))";
+				}
 			}
 		}
 		return $where;
@@ -184,7 +183,7 @@ class Post_Localizer {
 		return $permalink;
 	}
 	function localize_title( $title, $id ){
-		//print_r(STELLA_CURRENT_LANG);die;
+		if( '' == $id) return '';
 		
 		if ( STELLA_CURRENT_LANG != STELLA_DEFAULT_LANG ){
 			$title_new = get_post_meta( $id, '_title-' . STELLA_CURRENT_LANG, true );
@@ -265,25 +264,37 @@ class Post_Localizer {
 	}
 	function add_metaboxes() {
 		// Searching for custom post types.
+
 		$post_types = get_post_types('', 'names');
-		
+
+
 		// Adding metaboxes for every post type.
 		foreach ($this->langs['others'] as $prefix => $lang) {
 			foreach ($post_types as $post_type) {
-				add_meta_box('post-in-' . $lang['prefix'], $lang['prefix'], array($this, 'show_title_body_metabox'), $post_type, 'normal', 'high', array('prefix' => $lang['prefix']));
-				add_meta_box('excerpt-' . $lang['prefix'], __('Excerpt') . '-' . $lang['name'], array($this, 'show_excerpt_metabox'), $post_type, 'normal', 'high', array('prefix' => $lang['prefix']));
+				if ( post_type_supports( $post_type, 'title' ) || post_type_supports( $post_type, 'editor' ) ) {
+					add_meta_box('post-in-' . $lang['prefix'], $lang['prefix'], array($this, 'show_title_body_metabox'), $post_type, 'normal', 'high', array('prefix' => $lang['prefix']));
+				}
+				if ( post_type_supports( $post_type, 'excerpt' ) ) {
+					add_meta_box('excerpt-' . $lang['prefix'], __('Excerpt') . '-' . $lang['name'], array($this, 'show_excerpt_metabox'), $post_type, 'normal', 'high', array('prefix' => $lang['prefix']));
+				}
 			}
 		}
 	}
 	function show_excerpt_metabox( $post, $metabox ){
-		$prefix = $metabox['args']['prefix'];
-		$excerpt = get_post_meta( $post->ID, '_excerpt-' . $prefix, true );
-		$help = __('Excerpts are optional hand-crafted summaries of your content that can be used in your theme. <a href="http://codex.wordpress.org/Excerpt" target="_blank">Learn more about manual excerpts.</a>');
-		$meta_html = <<<meta_html
-			<textarea rows="1" cols="40" name="excerpt-$prefix" id="excerpt-$prefix" class="post-excerpt">$excerpt</textarea>
-			<p>$help</p>	
+
+		$post_type = get_post_type($post);
+		if ( post_type_supports( $post_type, 'excerpt' ) ) {
+
+			$prefix = $metabox['args']['prefix'];
+			$excerpt = get_post_meta( $post->ID, '_excerpt-' . $prefix, true );
+			$help = __('Excerpts are optional hand-crafted summaries of your content that can be used in your theme. <a href="http://codex.wordpress.org/Excerpt" target="_blank">Learn more about manual excerpts.</a>');
+			$meta_html = <<<meta_html
+				<textarea rows="1" cols="40" name="excerpt-$prefix" id="excerpt-$prefix" class="post-excerpt">$excerpt</textarea>
+				<p>$help</p>
 meta_html;
-		echo $meta_html;
+			echo $meta_html;
+
+		}
 	}
 	function show_title_body_metabox( $post, $metabox ){
 		// getting meta data
@@ -299,17 +310,17 @@ meta_html;
 
 		$permalink_html = '<div id="edit-slug-box"><strong></strong><span id="sample-permalink"></span></div>';
 		
-		if (!post_type_supports($post_type, 'editor'))
-			$permalink_html = "";
-		$title_html = <<<title_html
-		<div class="titlediv">
-			<input class="like-default-title" type="text" name="title-$prefix" value="$title"/>	
-			$permalink_html
-		</div>
+		if ( post_type_supports($post_type, 'title')){
+				$permalink_html = "";
+			$title_html = <<<title_html
+			<div class="titlediv">
+				<input class="like-default-title" type="text" name="title-$prefix" value="$title"/>
+				$permalink_html
+			</div>
 title_html;
-		echo $title_html;
-
-		if (post_type_supports($post_type, 'editor'))
+			echo $title_html;
+		}
+		if ( post_type_supports($post_type, 'editor'))
 			wp_editor($body, 'tinymce' . $prefix, array('textarea_name' => 'body-' . $prefix, 'media_buttons' => true, 'tinemce' => true));
 	}
 
@@ -351,16 +362,23 @@ title_html;
 		}
 		return $result;
 	}
-
+	
 	function add_styles() {
-		wp_enqueue_style('stella_styles', stella_plugin_url() . 'css/tabs.css');
+		global $stella_plugin;
+		if( ! $stella_plugin->is_widgetkit_page() ) wp_enqueue_style('stella_post_styles', stella_plugin_url() . 'css/tabs.css', defined('WPSEO_VERSION') ? array('metabox-tabs') : array());
 	}
-
+	
+	
 	function add_scripts() {
 		global $post;
 		$post_type = ( isset($post) ) ? get_post_type( $post->ID ) : 'any';
-		wp_enqueue_script('jquery-ui-tabs');
+		global $stella_plugin;
+
+		if( ! $stella_plugin->is_widgetkit_page() ) wp_enqueue_script('jquery-ui-tabs');
+
 		wp_enqueue_script('stella_post_tabs', stella_plugin_url() . 'js/post-tabs.js');
+        wp_enqueue_script('svcc_js', stella_plugin_url() . 'js/vc-switcher.js', array(), false, true );
+
 		wp_localize_script('stella_post_tabs', 'post_vars', json_encode(array('langs' => $this->get_indexed_language_list(), 'post_type' => $post_type, 'default_str' => __('Default','stella-plugin'))));
 	}
 }

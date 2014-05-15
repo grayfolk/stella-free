@@ -96,7 +96,7 @@ class Bloginfo_Localizer {
 	}
 	function localize_blogname($value){
 
-		if (STELLA_CURRENT_LANG != STELLA_DEFAULT_LANG){
+		if ( defined('STELLA_CURRENT_LANG') && defined('STELLA_DEFAULT_LANG') && STELLA_CURRENT_LANG != STELLA_DEFAULT_LANG){
 
 			$value_new = ( is_multisite() ) ? get_blog_option( get_current_blog_id(), 'blogname-'.STELLA_CURRENT_LANG ) : get_option( 'blogname-'.STELLA_CURRENT_LANG );
 
@@ -135,7 +135,7 @@ class Bloginfo_Localizer {
 		$prefix = $args['prefix'];
 		$value = ( is_multisite() ) ? get_blog_option( get_current_blog_id(), 'blogdescription-'.$prefix ) : get_option( 'blogdescription-'.$prefix );
 		echo '<input name="blogdescription-'.$prefix.'" type="text" id="blogdescription-'.$prefix.'" value="' . $value . '" class="regular-text"/>';
-		echo '<span class="description"> '.__('In a few words, explain what this site is about.').'</span>';
+		echo '<p class="description"> '.__('In a few words, explain what this site is about.').'</p>';
 	}
 	function get_indexed_language_list() {
 
@@ -148,18 +148,19 @@ class Bloginfo_Localizer {
 		return $result;
 	}
 	function add_styles() {
-		wp_enqueue_style('stella_styles', stella_plugin_url() . 'css/tabs.css');
+		global $stella_plugin;
+		if( ! $stella_plugin->is_widgetkit_page() ) wp_enqueue_style('stella_styles', stella_plugin_url() . 'css/tabs.css');
 	}
 
 	function add_scripts() {
-		wp_enqueue_script('jquery-ui-tabs');
+		global $stella_plugin;
+		if( ! $stella_plugin->is_widgetkit_page() ) wp_enqueue_script('jquery-ui-tabs');
 		wp_enqueue_script('stella_bloginfo_tabs', stella_plugin_url() . 'js/bloginfo-tabs.js');
 		
 		( false == strpos($_SERVER['REQUEST_URI'],"site-settings.php") ) ? $mu_settings_page = false : $mu_settings_page = true;
 		
 		wp_localize_script('stella_bloginfo_tabs', 'bloginfo_langs', json_encode(array('langs' => $this->get_indexed_language_list(), 'default_str' => __('Default','stella-plugin'), 'mu_settings_page' => $mu_settings_page)));
 	}
-
 }
 
 new Bloginfo_Localizer();
